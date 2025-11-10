@@ -86,7 +86,6 @@ Or download manually from:
 **Recommendations**:
 - **RTX 4090/A6000+**: Use bfloat16 + no quantization for best quality
 - **RTX 3090/4080**: Use bfloat16 + int8 quantization
-- **RTX 3060-3080**: Use float16 + int8 quantization
 - **Lower VRAM**: Use int4 quantization (quality trade-off)
 
 ---
@@ -317,8 +316,8 @@ n_edit_iterations: 1
 <details>
 <summary><b>Precision (torch_dtype)</b></summary>
 
-- **bfloat16**: Best quality, stable, 8GB VRAM, recommended for RTX 30xx+
-- **float16**: Good quality, 6GB VRAM, compatible with most GPUs
+- **bfloat16**: Best quality, stable, 11GB VRAM, recommended for RTX 40xx+
+- **float16**: Good quality, 10GB VRAM, compatible with most GPUs
 - **float32**: Maximum quality, 16GB VRAM, overkill for most use cases
 - **auto**: Automatically selects best for your GPU
 
