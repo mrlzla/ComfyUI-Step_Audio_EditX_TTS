@@ -316,9 +316,9 @@ n_edit_iterations: 1
 <details>
 <summary><b>Precision (torch_dtype)</b></summary>
 
-- **bfloat16**: Best quality, stable, 11GB VRAM, recommended for RTX 40xx+
-- **float16**: Good quality, 10GB VRAM, compatible with most GPUs
-- **float32**: Maximum quality, 16GB VRAM, overkill for most use cases
+- **bfloat16**: Best quality, stable, recommended for RTX 40xx+
+- **float16**: Good quality, compatible with most GPUs
+- **float32**: Maximum quality, 16GB+ VRAM, overkill for most use cases
 - **auto**: Automatically selects best for your GPU
 
 </details>
@@ -327,8 +327,8 @@ n_edit_iterations: 1
 <summary><b>Quantization</b></summary>
 
 - **none**: Best quality, highest VRAM (8GB+)
-- **int8**: Good quality, medium VRAM (4-6GB), recommended for VRAM-constrained systems
-- **int4**: Acceptable quality, low VRAM (3-4GB), noticeable quality loss
+- **int8**: Good quality, medium VRAM , recommended for VRAM-constrained systems
+- **int4**: Acceptable quality, low VRAM , noticeable quality loss
 - **int4_awq**: Optimized int4, slightly better than standard int4
 
 </details>
