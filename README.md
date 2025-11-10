@@ -29,7 +29,7 @@
 
 <br>
 
-Professional native ComfyUI nodes for **Step Audio EditX** - State-of-the-art zero-shot voice cloning and audio editing with emotion, style, speed control, and more.
+Native ComfyUI nodes for **Step Audio EditX** - State-of-the-art zero-shot voice cloning and audio editing with emotion, style, speed control, and more.
 
 ## 🎯 Key Features
 
