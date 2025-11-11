@@ -80,7 +80,7 @@ class StepAudioEditNode:
                 }),
                 "quantization": (["none", "int4", "int8", "int4_awq"], {
                     "default": "none",
-                    "tooltip": "VRAM reduction: 'none' (best quality, 8GB VRAM), int8 (good quality, 4GB VRAM), int4 (acceptable quality, 3GB VRAM), int4_awq (optimized int4). Use if low on VRAM."
+                    "tooltip": "VRAM reduction: 'none' (best quality, 8GB VRAM), int8 (good quality, 4GB VRAM), int4 (acceptable quality, 3GB VRAM), int4_awq (optimized int4, requires pre-quantized model). Use if low on VRAM."
                 }),
                 "attention_mechanism": (["sdpa", "eager", "flash_attn", "sage_attn"], {
                     "default": "sdpa",
