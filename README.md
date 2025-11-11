@@ -43,6 +43,13 @@ Native ComfyUI nodes for **Step Audio EditX** - State-of-the-art zero-shot voice
 
 ---
 
+## Requirements
+
+- **FFmpeg** must be installed on your system (not just the Python package)
+  - Windows: Download from https://ffmpeg.org/download.html and add to PATH
+  - Linux: `sudo apt install ffmpeg`
+  - Mac: `brew install ffmpeg`
+- Python dependencies will be installed automatically
 
 ## 📦 Installation
 
