@@ -331,7 +331,7 @@ class StepAudioTTS:
         do_sample: bool = True,
         max_new_tokens: int = 8192,
         progress_bar=None,  # ComfyUI progress bar
-        match_input_length: bool = True,  # NEW: Match output to input audio length
+        match_input_length: bool = False,  # NEW: Match output to input audio length (disabled by default for clone)
     ) -> Tuple[torch.Tensor, int]:
         """
         Clone voice from reference audio
@@ -367,13 +367,15 @@ class StepAudioTTS:
                 if match_input_length:
                     input_duration = librosa.get_duration(path=prompt_wav_path)
                     target_token_count = int(input_duration * 25)  # 25 tokens/second
-                    # Add 15% buffer for natural variation
-                    buffer = int(target_token_count * 0.15)
+                    # Add 50% buffer for natural variation and different text lengths
+                    # (Clone mode: target text may be longer/shorter than prompt text)
+                    buffer_percent = 0.50
+                    buffer = int(target_token_count * buffer_percent)
                     max_new_tokens_adjusted = min(target_token_count + buffer, max_new_tokens)
-                    print(f"[StepAudio]   Length matching enabled:")
+                    print(f"[StepAudio]   Length matching enabled (clone mode):")
                     print(f"[StepAudio]     Input duration: {input_duration:.2f}s")
-                    print(f"[StepAudio]     Target tokens: {target_token_count} (+ {buffer} buffer)")
-                    print(f"[StepAudio]     Max new tokens: {max_new_tokens_adjusted}")
+                    print(f"[StepAudio]     Target tokens: {target_token_count} (+{int(buffer_percent*100)}% buffer = {buffer})")
+                    print(f"[StepAudio]     Max new tokens: {max_new_tokens_adjusted} (was {max_new_tokens})")
                 else:
                     max_new_tokens_adjusted = max_new_tokens
 
@@ -473,15 +475,25 @@ class StepAudioTTS:
                 if match_input_length:
                     input_duration = librosa.get_duration(path=input_audio_path)
                     target_token_count = int(input_duration * 25)  # 25 tokens/second
-                    # Add 15% buffer for natural variation
-                    buffer = int(target_token_count * 0.15)
+                    # Add 30% buffer for natural variation in edit mode
+                    # (Edit mode: content length should be similar, but edits can add/remove tokens)
+                    buffer_percent = 0.30
+                    buffer = int(target_token_count * buffer_percent)
                     max_new_tokens_adjusted = min(target_token_count + buffer, max_new_tokens)
-                    print(f"[StepAudio]   Length matching enabled:")
-                    print(f"[StepAudio]     Input duration: {input_duration:.2f}s")
-                    print(f"[StepAudio]     Target tokens: {target_token_count} (+ {buffer} buffer)")
-                    print(f"[StepAudio]     Max new tokens: {max_new_tokens_adjusted}")
+
+                    print(f"[StepAudio]   ========================================")
+                    print(f"[StepAudio]   LENGTH MATCHING ENABLED (EDIT MODE)")
+                    print(f"[StepAudio]   ========================================")
+                    print(f"[StepAudio]   Input audio duration: {input_duration:.2f}s")
+                    print(f"[StepAudio]   Expected output duration: ~{input_duration:.2f}s")
+                    print(f"[StepAudio]   Target tokens: {target_token_count} tokens")
+                    print(f"[StepAudio]   Buffer: +{int(buffer_percent*100)}% ({buffer} tokens)")
+                    print(f"[StepAudio]   Max new tokens: {max_new_tokens_adjusted}")
+                    print(f"[StepAudio]   (Original max was: {max_new_tokens})")
+                    print(f"[StepAudio]   ========================================")
                 else:
                     max_new_tokens_adjusted = max_new_tokens
+                    print(f"[StepAudio]   Length matching DISABLED - using max_new_tokens={max_new_tokens}")
 
                 # Build instruction prefix based on edit type
                 instruct_prefix = self._build_audio_edit_instruction(audio_text, edit_type, edit_info, text)

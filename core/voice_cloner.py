@@ -43,7 +43,7 @@ class VoiceCloner:
         do_sample: bool = True,
         max_new_tokens: int = 8192,
         longform_chunking: bool = False,
-        match_input_length: bool = True  # NEW: Match output to input audio length
+        match_input_length: bool = False  # NEW: Disabled by default for clone (target text != prompt audio)
     ) -> Dict[str, Any]:
         """
         Clone a voice from reference audio and generate new speech.
