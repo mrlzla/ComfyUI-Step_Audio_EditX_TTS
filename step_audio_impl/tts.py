@@ -331,6 +331,7 @@ class StepAudioTTS:
         do_sample: bool = True,
         max_new_tokens: int = 8192,
         progress_bar=None,  # ComfyUI progress bar
+        match_input_length: bool = True,  # NEW: Match output to input audio length
     ) -> Tuple[torch.Tensor, int]:
         """
         Clone voice from reference audio
@@ -343,6 +344,7 @@ class StepAudioTTS:
             do_sample: Whether to use sampling (default: True)
             max_new_tokens: Maximum number of new tokens to generate (default: 8192)
             progress_bar: ComfyUI progress bar for progress tracking
+            match_input_length: If True, constrain output length to match input audio duration (default: True)
 
         Returns:
             Tuple[torch.Tensor, int]: Generated audio tensor and sample rate
@@ -360,6 +362,20 @@ class StepAudioTTS:
                 prompt_wav_tokens = self.audio_tokenizer.merge_vq0206_to_token_str(
                     vq02_codes_ori, vq06_codes_ori
                 )
+
+                # LENGTH CONSTRAINT FIX: Calculate target tokens from input audio duration
+                if match_input_length:
+                    input_duration = librosa.get_duration(path=prompt_wav_path)
+                    target_token_count = int(input_duration * 25)  # 25 tokens/second
+                    # Add 15% buffer for natural variation
+                    buffer = int(target_token_count * 0.15)
+                    max_new_tokens_adjusted = min(target_token_count + buffer, max_new_tokens)
+                    print(f"[StepAudio]   Length matching enabled:")
+                    print(f"[StepAudio]     Input duration: {input_duration:.2f}s")
+                    print(f"[StepAudio]     Target tokens: {target_token_count} (+ {buffer} buffer)")
+                    print(f"[StepAudio]     Max new tokens: {max_new_tokens_adjusted}")
+                else:
+                    max_new_tokens_adjusted = max_new_tokens
 
                 token_ids = self._encode_audio_edit_clone_prompt(
                     target_text,
@@ -382,12 +398,12 @@ class StepAudioTTS:
                 stopping_criteria = None
                 if progress_bar is not None:
                     stopping_criteria = StoppingCriteriaList([
-                        InterruptionStoppingCriteria(progress_bar, max_new_tokens)
+                        InterruptionStoppingCriteria(progress_bar, max_new_tokens_adjusted)
                     ])
 
                 output_ids = self.llm.generate(
                     input_tensor,
-                    max_new_tokens=max_new_tokens,
+                    max_new_tokens=max_new_tokens_adjusted,
                     temperature=temperature,
                     do_sample=do_sample,
                     logits_processor=LogitsProcessorList([RepetitionAwareLogitsProcessor()]),
@@ -418,7 +434,11 @@ class StepAudioTTS:
         audio_text: str,
         edit_type: str,
         edit_info: Optional[str] = None,
-        text: Optional[str] = None
+        text: Optional[str] = None,
+        match_input_length: bool = True,  # NEW: Match output to input audio length
+        temperature: float = 0.7,  # NEW: Make temperature configurable
+        do_sample: bool = True,  # NEW: Make do_sample configurable
+        max_new_tokens: int = 8192,  # NEW: Make max_new_tokens configurable
     ) -> Tuple[torch.Tensor, int]:
         """
         Edit audio based on specified edit type
@@ -429,6 +449,10 @@ class StepAudioTTS:
             edit_type: Type of edit (emotion, style, speed, etc.)
             edit_info: Specific edit information (happy, sad, etc.)
             text: Target text for para-linguistic editing
+            match_input_length: If True, constrain output length to match input audio duration (default: True)
+            temperature: Sampling temperature (default: 0.7)
+            do_sample: Whether to use sampling (default: True)
+            max_new_tokens: Maximum number of new tokens to generate (default: 8192)
 
         Returns:
             Tuple[torch.Tensor, int]: Edited audio tensor and sample rate
@@ -444,6 +468,21 @@ class StepAudioTTS:
                 audio_tokens = self.audio_tokenizer.merge_vq0206_to_token_str(
                     vq02_codes_ori, vq06_codes_ori
                 )
+
+                # LENGTH CONSTRAINT FIX: Calculate target tokens from input audio duration
+                if match_input_length:
+                    input_duration = librosa.get_duration(path=input_audio_path)
+                    target_token_count = int(input_duration * 25)  # 25 tokens/second
+                    # Add 15% buffer for natural variation
+                    buffer = int(target_token_count * 0.15)
+                    max_new_tokens_adjusted = min(target_token_count + buffer, max_new_tokens)
+                    print(f"[StepAudio]   Length matching enabled:")
+                    print(f"[StepAudio]     Input duration: {input_duration:.2f}s")
+                    print(f"[StepAudio]     Target tokens: {target_token_count} (+ {buffer} buffer)")
+                    print(f"[StepAudio]     Max new tokens: {max_new_tokens_adjusted}")
+                else:
+                    max_new_tokens_adjusted = max_new_tokens
+
                 # Build instruction prefix based on edit type
                 instruct_prefix = self._build_audio_edit_instruction(audio_text, edit_type, edit_info, text)
 
@@ -464,9 +503,9 @@ class StepAudioTTS:
 
                 output_ids = self.llm.generate(
                     torch.tensor([prompt_tokens]).to(torch.long).to(device),
-                    max_length=8192,
-                    temperature=0.7,
-                    do_sample=True,
+                    max_new_tokens=max_new_tokens_adjusted,
+                    temperature=temperature,
+                    do_sample=do_sample,
                     logits_processor=LogitsProcessorList([RepetitionAwareLogitsProcessor()]),
                 )
 

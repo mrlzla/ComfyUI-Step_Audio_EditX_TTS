@@ -46,7 +46,8 @@ class AudioEditor:
         temperature: float = 0.7,
         do_sample: bool = True,
         max_new_tokens: int = 8192,
-        longform_chunking: bool = False
+        longform_chunking: bool = False,
+        match_input_length: bool = True  # NEW: Match output to input audio length
     ) -> Dict[str, Any]:
         """
         Edit audio with specified modification.
@@ -102,7 +103,8 @@ class AudioEditor:
                 n_edit_iterations=n_edit_iterations,
                 temperature=temperature,
                 do_sample=do_sample,
-                max_new_tokens=max_new_tokens
+                max_new_tokens=max_new_tokens,
+                match_input_length=match_input_length
             )
 
             print(f"[StepAudio] Audio editing completed successfully!")
@@ -127,7 +129,8 @@ class AudioEditor:
         n_edit_iterations: int,
         temperature: float,
         do_sample: bool,
-        max_new_tokens: int
+        max_new_tokens: int,
+        match_input_length: bool = True
     ) -> Tuple[torch.Tensor, int]:
         """
         Perform single-shot audio editing (no chunking).
@@ -142,6 +145,7 @@ class AudioEditor:
             temperature: Sampling temperature
             do_sample: Whether to use sampling
             max_new_tokens: Maximum number of new tokens to generate
+            match_input_length: If True, constrain output length to match input audio duration
 
         Returns:
             (audio_tensor, sample_rate)
@@ -156,7 +160,8 @@ class AudioEditor:
             n_edit_iter=n_edit_iterations,
             temperature=temperature,
             do_sample=do_sample,
-            max_new_tokens=max_new_tokens
+            max_new_tokens=max_new_tokens,
+            match_input_length=match_input_length
         )
 
         return audio_tensor, sample_rate

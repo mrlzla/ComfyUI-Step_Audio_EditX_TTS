@@ -425,7 +425,8 @@ class StepAudioModelWrapper:
         temperature: float = 0.7,
         do_sample: bool = True,
         max_new_tokens: int = 8192,
-        progress_bar=None
+        progress_bar=None,
+        match_input_length: bool = True  # NEW: Match output to input audio length
     ) -> Tuple[torch.Tensor, int]:
         """
         Perform voice cloning.
@@ -438,6 +439,7 @@ class StepAudioModelWrapper:
             do_sample: Whether to use sampling
             max_new_tokens: Maximum number of new tokens to generate
             progress_bar: ComfyUI progress bar for token generation tracking
+            match_input_length: If True, constrain output length to match input audio duration (default: True)
 
         Returns:
             (audio_tensor, sample_rate)
@@ -457,7 +459,8 @@ class StepAudioModelWrapper:
             temperature,
             do_sample,
             max_new_tokens,
-            progress_bar
+            progress_bar,
+            match_input_length
         )
 
     def edit(
@@ -468,9 +471,10 @@ class StepAudioModelWrapper:
         edit_info: Optional[str] = None,
         text: Optional[str] = None,
         n_edit_iter: int = 1,
-        temperature: float = 0.7,  # Not used by StepAudioTTS.edit() - hardcoded to 0.7
-        do_sample: bool = True,     # Not used by StepAudioTTS.edit() - hardcoded to True
-        max_new_tokens: int = 8192  # Not used by StepAudioTTS.edit() - hardcoded to 8192
+        temperature: float = 0.7,
+        do_sample: bool = True,
+        max_new_tokens: int = 8192,
+        match_input_length: bool = True  # NEW: Match output to input audio length
     ) -> Tuple[torch.Tensor, int]:
         """
         Perform audio editing with iterative refinement.
@@ -482,18 +486,16 @@ class StepAudioModelWrapper:
             edit_info: Specific edit value
             text: Optional text for paralinguistic mode
             n_edit_iter: Number of edit iterations (1-5). Each iteration refines the edit.
-            temperature: Sampling temperature (NOT USED - hardcoded to 0.7 in model)
-            do_sample: Whether to use sampling (NOT USED - hardcoded to True in model)
-            max_new_tokens: Maximum new tokens (NOT USED - hardcoded to 8192 in model)
+            temperature: Sampling temperature (default: 0.7)
+            do_sample: Whether to use sampling (default: True)
+            max_new_tokens: Maximum new tokens (default: 8192)
+            match_input_length: If True, constrain output length to match input audio duration (default: True)
 
         Returns:
             (audio_tensor, sample_rate)
 
         Note:
-            The StepAudioTTS.edit() method has hardcoded generation parameters:
-            - temperature=0.7, do_sample=True, max_new_tokens=8192
-            These cannot be changed. The n_edit_iter parameter is implemented
-            by calling edit() multiple times in sequence.
+            The n_edit_iter parameter is implemented by calling edit() multiple times in sequence.
             Progress bar is not supported in edit mode.
         """
         import tempfile
@@ -515,7 +517,11 @@ class StepAudioModelWrapper:
             audio_text=audio_text,
             edit_type=edit_type,
             edit_info=edit_info,
-            text=text
+            text=text,
+            match_input_length=match_input_length,
+            temperature=temperature,
+            do_sample=do_sample,
+            max_new_tokens=max_new_tokens
         )
 
         # Additional iterations: refine the edit by re-editing the output
@@ -541,7 +547,11 @@ class StepAudioModelWrapper:
                         audio_text=audio_text,
                         edit_type=edit_type,
                         edit_info=edit_info,
-                        text=text
+                        text=text,
+                        match_input_length=match_input_length,
+                        temperature=temperature,
+                        do_sample=do_sample,
+                        max_new_tokens=max_new_tokens
                     )
                 finally:
                     # Clean up temp file

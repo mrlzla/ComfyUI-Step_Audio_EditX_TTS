@@ -42,7 +42,8 @@ class VoiceCloner:
         temperature: float = 0.7,
         do_sample: bool = True,
         max_new_tokens: int = 8192,
-        longform_chunking: bool = False
+        longform_chunking: bool = False,
+        match_input_length: bool = True  # NEW: Match output to input audio length
     ) -> Dict[str, Any]:
         """
         Clone a voice from reference audio and generate new speech.
@@ -54,6 +55,7 @@ class VoiceCloner:
             trim_silence: Whether to trim silence from audio
             energy_norm: Whether to apply energy normalization
             seed: Random seed (0 for random)
+            match_input_length: If True, constrain output length to match input audio duration (default: True)
 
         Returns:
             ComfyUI AUDIO format dict with generated speech
@@ -140,7 +142,8 @@ class VoiceCloner:
                         chunker=chunker,
                         temperature=temperature,
                         do_sample=do_sample,
-                        max_new_tokens=max_new_tokens
+                        max_new_tokens=max_new_tokens,
+                        match_input_length=match_input_length
                     )
                 else:
                     print(f"[StepAudio]    ℹ️  Estimated output fits within limit, single-shot generation")
@@ -151,7 +154,8 @@ class VoiceCloner:
                         target_text=target_text,
                         temperature=temperature,
                         do_sample=do_sample,
-                        max_new_tokens=max_new_tokens
+                        max_new_tokens=max_new_tokens,
+                        match_input_length=match_input_length
                     )
             else:
                 # Standard single-shot generation (no chunking)
@@ -163,7 +167,8 @@ class VoiceCloner:
                     target_text=target_text,
                     temperature=temperature,
                     do_sample=do_sample,
-                    max_new_tokens=max_new_tokens
+                    max_new_tokens=max_new_tokens,
+                    match_input_length=match_input_length
                 )
 
             print(f"[StepAudio] Voice cloning completed successfully!")
@@ -185,7 +190,8 @@ class VoiceCloner:
         target_text: str,
         temperature: float,
         do_sample: bool,
-        max_new_tokens: int
+        max_new_tokens: int,
+        match_input_length: bool = True
     ) -> Tuple[torch.Tensor, int]:
         """
         Perform single-shot voice cloning (no chunking).
@@ -197,6 +203,7 @@ class VoiceCloner:
             temperature: Sampling temperature
             do_sample: Whether to use sampling
             max_new_tokens: Maximum number of new tokens to generate
+            match_input_length: If True, constrain output length to match input audio duration
 
         Returns:
             (audio_tensor, sample_rate)
@@ -211,7 +218,8 @@ class VoiceCloner:
             temperature=temperature,
             do_sample=do_sample,
             max_new_tokens=max_new_tokens,
-            progress_bar=pbar
+            progress_bar=pbar,
+            match_input_length=match_input_length
         )
 
         return audio_tensor, sample_rate
@@ -224,7 +232,8 @@ class VoiceCloner:
         chunker,
         temperature: float,
         do_sample: bool,
-        max_new_tokens: int
+        max_new_tokens: int,
+        match_input_length: bool = True
     ) -> Tuple[torch.Tensor, int]:
         """
         Perform chunked voice cloning for long-form text.
@@ -237,6 +246,7 @@ class VoiceCloner:
             temperature: Sampling temperature
             do_sample: Whether to use sampling
             max_new_tokens: Maximum new tokens to generate per chunk
+            match_input_length: If True, constrain output length to match input audio duration
 
         Returns:
             (stitched_audio_tensor, sample_rate)
@@ -261,6 +271,8 @@ class VoiceCloner:
             pbar = comfy.utils.ProgressBar(max_new_tokens)
 
             # Generate audio for chunk
+            # Note: For chunked generation, we disable match_input_length per chunk
+            # since each chunk has its own target text
             chunk_audio, chunk_sr = self.model.clone(
                 prompt_wav_path=prompt_audio_path,
                 prompt_text=prompt_text,
@@ -268,7 +280,8 @@ class VoiceCloner:
                 temperature=temperature,
                 do_sample=do_sample,
                 max_new_tokens=max_new_tokens,
-                progress_bar=pbar
+                progress_bar=pbar,
+                match_input_length=False  # Disable for chunks - each chunk has different text
             )
 
             audio_chunks.append(chunk_audio)
