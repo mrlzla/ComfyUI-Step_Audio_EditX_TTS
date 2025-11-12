@@ -471,28 +471,33 @@ class StepAudioTTS:
                     vq02_codes_ori, vq06_codes_ori
                 )
 
-                # LENGTH CONSTRAINT FIX: Calculate target tokens from input audio duration
+                # LENGTH CONSTRAINT FIX: Match exact input audio token count
                 if match_input_length:
+                    # Get the actual token count from input audio (ground truth)
+                    input_token_count = len(vq0206_codes)
                     input_duration = librosa.get_duration(path=input_audio_path)
-                    target_token_count = int(input_duration * 25)  # 25 tokens/second
-                    # Add 30% buffer for natural variation in edit mode
-                    # (Edit mode: content length should be similar, but edits can add/remove tokens)
-                    buffer_percent = 0.30
+
+                    # Use actual input token count as target (most accurate)
+                    target_token_count = input_token_count
+                    # Small buffer (10%) for minor variations during editing
+                    buffer_percent = 0.10
                     buffer = int(target_token_count * buffer_percent)
                     max_new_tokens_adjusted = min(target_token_count + buffer, max_new_tokens)
+                    min_new_tokens_adjusted = max(1, int(target_token_count * 0.95))  # 95% minimum
 
                     print(f"[StepAudio]   ========================================")
                     print(f"[StepAudio]   LENGTH MATCHING ENABLED (EDIT MODE)")
                     print(f"[StepAudio]   ========================================")
                     print(f"[StepAudio]   Input audio duration: {input_duration:.2f}s")
-                    print(f"[StepAudio]   Expected output duration: ~{input_duration:.2f}s")
-                    print(f"[StepAudio]   Target tokens: {target_token_count} tokens")
-                    print(f"[StepAudio]   Buffer: +{int(buffer_percent*100)}% ({buffer} tokens)")
-                    print(f"[StepAudio]   Max new tokens: {max_new_tokens_adjusted}")
-                    print(f"[StepAudio]   (Original max was: {max_new_tokens})")
+                    print(f"[StepAudio]   Input audio tokens: {input_token_count} tokens")
+                    print(f"[StepAudio]   Target tokens: {target_token_count} tokens (exact match)")
+                    print(f"[StepAudio]   Min tokens: {min_new_tokens_adjusted} (95%)")
+                    print(f"[StepAudio]   Max tokens: {max_new_tokens_adjusted} (110%)")
+                    print(f"[StepAudio]   Expected output: {input_duration:.2f}s ± 5%")
                     print(f"[StepAudio]   ========================================")
                 else:
                     max_new_tokens_adjusted = max_new_tokens
+                    min_new_tokens_adjusted = None
                     print(f"[StepAudio]   Length matching DISABLED - using max_new_tokens={max_new_tokens}")
 
                 # Build instruction prefix based on edit type
@@ -516,12 +521,20 @@ class StepAudioTTS:
                 output_ids = self.llm.generate(
                     torch.tensor([prompt_tokens]).to(torch.long).to(device),
                     max_new_tokens=max_new_tokens_adjusted,
+                    min_new_tokens=min_new_tokens_adjusted,
                     temperature=temperature,
                     do_sample=do_sample,
                     logits_processor=LogitsProcessorList([RepetitionAwareLogitsProcessor()]),
                 )
 
                 output_ids = output_ids[:, len(prompt_tokens) : -1]  # skip eos token
+                actual_tokens_generated = output_ids.shape[1]
+
+                if match_input_length:
+                    print(f"[StepAudio]   Actual tokens generated: {actual_tokens_generated}")
+                    print(f"[StepAudio]   Input had {input_token_count} tokens")
+                    print(f"[StepAudio]   Difference: {actual_tokens_generated - input_token_count:+d} tokens")
+                    print(f"[StepAudio]   Output duration: ~{actual_tokens_generated / 25:.2f}s vs input {input_duration:.2f}s")
                 vq0206_codes_vocoder = torch.tensor([vq0206_codes], dtype=torch.long) - 65536
                 logger.debug("Audio editing generation completed")
                 return (
