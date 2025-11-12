@@ -1,0 +1,39 @@
+American
+British
+Australian
+Canadian
+Irish
+Scottish
+Welsh
+South African
+New Zealand
+Indian
+Pakistani
+Singaporean
+Nigerian
+Jamaican
+Cockney
+Received Pronunciation
+RP
+Geordie
+Scouse
+Brummie
+Yorkshire
+Manchester
+London
+Essex
+Birmingham
+Liverpool
+Glasgow
+Edinburgh
+Boston
+New York
+Southern American
+Texan
+Californian
+Midwestern
+Brooklyn
+Chicago
+Philadelphia
+Baltimore
+remove

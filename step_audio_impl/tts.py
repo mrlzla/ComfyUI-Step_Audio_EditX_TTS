@@ -581,6 +581,11 @@ class StepAudioTTS:
                 instruct_prefix = f"Remove any speaking styles in the following audio and the reference text is: {audio_text}\n"
             else:
                 instruct_prefix = f"Make the following audio more {edit_info} style. The text corresponding to the audio is: {audio_text}\n"
+        elif edit_type == "accent":
+            if edit_info == "remove":
+                instruct_prefix = f"Remove any accent from the following audio and make it neutral. The text corresponding to the audio is: {audio_text}\n"
+            else:
+                instruct_prefix = f"Change the accent of the following audio to {edit_info} accent while keeping the same words and meaning. The text corresponding to the audio is: {audio_text}\n"
         elif edit_type == "denoise":
             instruct_prefix = f"Remove any noise from the given audio while preserving the voice content clearly. Ensure that the speech quality remains intact with minimal distortion, and eliminate all noise from the audio.\n"
         elif edit_type == "vad":

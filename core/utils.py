@@ -218,7 +218,7 @@ def get_edit_type_options(edit_type: str) -> List[str]:
     Get the available options for a given edit type.
 
     Args:
-        edit_type: One of 'emotion', 'style', 'speed', 'paralinguistic', 'denoising'
+        edit_type: One of 'emotion', 'style', 'accent', 'speed', 'paralinguistic', 'denoising'
 
     Returns:
         List of valid options for that edit type
@@ -227,6 +227,8 @@ def get_edit_type_options(edit_type: str) -> List[str]:
         return load_text_resource("emotions.txt")
     elif edit_type == "style":
         return load_text_resource("styles.txt")
+    elif edit_type == "accent":
+        return load_text_resource("accents.txt")
     elif edit_type == "speed":
         return ["faster", "slower", "more faster", "more slower"]
     elif edit_type == "paralinguistic":

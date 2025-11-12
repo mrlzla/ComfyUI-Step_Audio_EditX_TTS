@@ -23,7 +23,7 @@ class AudioEditor:
     """
 
     # Valid edit types
-    VALID_EDIT_TYPES = ["emotion", "style", "speed", "paralinguistic", "denoising"]
+    VALID_EDIT_TYPES = ["emotion", "style", "accent", "speed", "paralinguistic", "denoising"]
 
     def __init__(self, model_wrapper: StepAudioModelWrapper):
         """

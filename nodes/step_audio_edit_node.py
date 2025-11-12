@@ -46,11 +46,13 @@ class StepAudioEditNode:
         # Load edit options from resources
         emotions = load_text_resource("emotions.txt")
         styles = load_text_resource("styles.txt")
+        accents = load_text_resource("accents.txt")
         paralinguistic = load_text_resource("paralinguistic.txt")
 
         # Build option lists
         emotion_options = ["none"] + emotions if emotions else ["none", "happy", "sad", "angry", "excited", "calm"]
         style_options = ["none"] + styles if styles else ["none", "whisper", "gentle", "serious", "casual"]
+        accent_options = ["none"] + accents if accents else ["none", "British", "American", "Australian", "Indian", "Irish"]
         speed_options = ["none", "faster", "slower", "more faster", "more slower"]
         para_options = ["none"] + paralinguistic if paralinguistic else ["none", "[Laughter]", "[Breathing]", "[Sigh]"]
         denoise_options = ["none", "denoise", "vad"]
@@ -87,10 +89,10 @@ class StepAudioEditNode:
                     "tooltip": "Attention layer: sdpa (fastest, good VRAM, default), eager (slowest, most stable), flash_attn (fastest, needs RTX 30xx+), sage_attn (best VRAM efficiency)."
                 }),
 
-                # 7-12. Edit configuration
-                "edit_type": (["emotion", "style", "speed", "paralinguistic", "denoising"], {
+                # 7-13. Edit configuration
+                "edit_type": (["emotion", "style", "accent", "speed", "paralinguistic", "denoising"], {
                     "default": "emotion",
-                    "tooltip": "Edit category: emotion (happy, sad, angry), style (whisper, formal), speed (faster/slower), paralinguistic (laughter, breathing), denoising (clean audio). Only one type per edit."
+                    "tooltip": "Edit category: emotion (happy, sad, angry), style (whisper, formal), accent (British, American, etc), speed (faster/slower), paralinguistic (laughter, breathing), denoising (clean audio). Only one type per edit."
                 }),
                 "emotion": (emotion_options, {
                     "default": "none",
@@ -99,6 +101,10 @@ class StepAudioEditNode:
                 "style": (style_options, {
                     "default": "none",
                     "tooltip": "Speaking style (only if edit_type=style): whisper, gentle, serious, casual, formal, friendly. Changes delivery style while keeping voice and emotion."
+                }),
+                "accent": (accent_options, {
+                    "default": "none",
+                    "tooltip": "Target accent (only if edit_type=accent): British, American, Australian, Indian, Irish, Scottish, Cockney, etc. Changes the pronunciation accent while keeping the same words, voice identity, and meaning."
                 }),
                 "speed": (speed_options, {
                     "default": "none",
@@ -184,6 +190,7 @@ class StepAudioEditNode:
         edit_type: str,
         emotion: str,
         style: str,
+        accent: str,
         speed: str,
         paralinguistic: str,
         denoising: str,
@@ -208,7 +215,7 @@ class StepAudioEditNode:
         Args:
             audio_text: Transcript of the input audio
             edit_type: Type of edit to apply
-            emotion/style/speed/paralinguistic/denoising: Edit parameters
+            emotion/style/accent/speed/paralinguistic/denoising: Edit parameters
             input_audio: Input audio (ComfyUI AUDIO dict)
 
         Returns:
@@ -225,6 +232,7 @@ class StepAudioEditNode:
         edit_info_map = {
             "emotion": emotion,
             "style": style,
+            "accent": accent,
             "speed": speed,
             "paralinguistic": paralinguistic,
             "denoising": denoising
