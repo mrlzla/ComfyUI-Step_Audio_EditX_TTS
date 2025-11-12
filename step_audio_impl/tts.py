@@ -471,33 +471,25 @@ class StepAudioTTS:
                     vq02_codes_ori, vq06_codes_ori
                 )
 
-                # LENGTH CONSTRAINT FIX: Match exact input audio token count
+                # Store input token count for feature interpolation (no token constraints)
                 if match_input_length:
                     # Get the actual token count from input audio (ground truth)
                     input_token_count = len(vq0206_codes)
                     input_duration = librosa.get_duration(path=input_audio_path)
-
-                    # Use actual input token count as target (most accurate)
-                    target_token_count = input_token_count
-                    # Small buffer (10%) for minor variations during editing
-                    buffer_percent = 0.10
-                    buffer = int(target_token_count * buffer_percent)
-                    max_new_tokens_adjusted = min(target_token_count + buffer, max_new_tokens)
-                    min_new_tokens_adjusted = max(1, int(target_token_count * 0.95))  # 95% minimum
 
                     print(f"[StepAudio]   ========================================")
                     print(f"[StepAudio]   LENGTH MATCHING ENABLED (EDIT MODE)")
                     print(f"[StepAudio]   ========================================")
                     print(f"[StepAudio]   Input audio duration: {input_duration:.2f}s")
                     print(f"[StepAudio]   Input audio tokens: {input_token_count} tokens")
-                    print(f"[StepAudio]   Target tokens: {target_token_count} tokens (exact match)")
-                    print(f"[StepAudio]   Min tokens: {min_new_tokens_adjusted} (95%)")
-                    print(f"[StepAudio]   Max tokens: {max_new_tokens_adjusted} (110%)")
-                    print(f"[StepAudio]   Expected output: {input_duration:.2f}s ± 5%")
+                    print(f"[StepAudio]   No token constraints - will use feature interpolation")
                     print(f"[StepAudio]   ========================================")
-                else:
-                    max_new_tokens_adjusted = max_new_tokens
-                    min_new_tokens_adjusted = None
+
+                # Don't restrict token generation - let model generate full text
+                max_new_tokens_adjusted = max_new_tokens
+                min_new_tokens_adjusted = None
+
+                if not match_input_length:
                     print(f"[StepAudio]   Length matching DISABLED - using max_new_tokens={max_new_tokens}")
 
                 # Build instruction prefix based on edit type
@@ -530,12 +522,52 @@ class StepAudioTTS:
                 output_ids = output_ids[:, len(prompt_tokens) : -1]  # skip eos token
                 actual_tokens_generated = output_ids.shape[1]
 
-                if match_input_length:
+                # Apply feature-level interpolation for length matching (vevosing-style)
+                if match_input_length and actual_tokens_generated != input_token_count:
                     print(f"[StepAudio]   Actual tokens generated: {actual_tokens_generated}")
                     print(f"[StepAudio]   Input had {input_token_count} tokens")
                     print(f"[StepAudio]   Difference: {actual_tokens_generated - input_token_count:+d} tokens")
                     print(f"[StepAudio]   Output duration: ~{actual_tokens_generated / 25:.2f}s vs input {input_duration:.2f}s")
-                vq0206_codes_vocoder = torch.tensor([vq0206_codes], dtype=torch.long) - 65536
+
+                    # Calculate length ratio for feature interpolation
+                    frame_len_ratio = input_token_count / actual_tokens_generated
+                    print(f"[StepAudio]   Applying feature interpolation with ratio: {frame_len_ratio:.4f}")
+
+                    # Interpolate speech_feat to match target length
+                    # speech_feat shape: [batch, time, feat_dim]
+                    original_feat_len = speech_feat.shape[1]
+                    speech_feat = speech_feat.transpose(1, 2)  # [batch, feat_dim, time]
+                    speech_feat = torch.nn.functional.interpolate(
+                        speech_feat,
+                        size=int(original_feat_len * frame_len_ratio),
+                        mode='linear',
+                        align_corners=False
+                    )  # [batch, feat_dim, time']
+                    speech_feat = speech_feat.transpose(1, 2)  # [batch, time', feat_dim]
+                    print(f"[StepAudio]   Speech features interpolated from {original_feat_len} to {speech_feat.shape[1]} frames")
+
+                    # Interpolate vq0206_codes tensor to match target length
+                    # This adjusts the conditioning signal from input audio
+                    vq0206_codes_tensor = torch.tensor([vq0206_codes], dtype=torch.long)  # [1, T]
+                    original_vq_len = vq0206_codes_tensor.shape[1]
+                    # Convert to float for interpolation, then back to long
+                    vq0206_codes_float = vq0206_codes_tensor.float().unsqueeze(1)  # [1, 1, T]
+                    vq0206_codes_float = torch.nn.functional.interpolate(
+                        vq0206_codes_float,
+                        size=input_token_count,
+                        mode='nearest'  # Use nearest for discrete token IDs
+                    )  # [1, 1, T']
+                    vq0206_codes_tensor = vq0206_codes_float.squeeze(1).long()  # [1, T']
+                    print(f"[StepAudio]   VQ codes interpolated from {original_vq_len} to {vq0206_codes_tensor.shape[1]} tokens")
+
+                    vq0206_codes_vocoder = vq0206_codes_tensor - 65536
+                    print(f"[StepAudio]   Final matched length: {input_token_count} tokens ({input_duration:.2f}s)")
+                elif match_input_length:
+                    print(f"[StepAudio]   Perfect match! Generated {actual_tokens_generated} tokens (target: {input_token_count})")
+                    vq0206_codes_vocoder = torch.tensor([vq0206_codes], dtype=torch.long) - 65536
+                else:
+                    vq0206_codes_vocoder = torch.tensor([vq0206_codes], dtype=torch.long) - 65536
+
                 logger.debug("Audio editing generation completed")
                 return (
                     self.cosy_model.token2wav_nonstream(
