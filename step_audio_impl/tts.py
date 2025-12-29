@@ -13,13 +13,6 @@ import warnings
 from typing import Tuple, Optional
 from http import HTTPStatus
 
-import torchaudio
-
-from model_loader import model_loader, ModelSource
-from config.prompts import AUDIO_EDIT_CLONE_SYSTEM_PROMPT_TPL, AUDIO_EDIT_SYSTEM_PROMPT
-from stepvocoder.cosyvoice2.cli.cosyvoice import CosyVoice
-from transformers.generation.logits_process import LogitsProcessor
-from transformers.generation.utils import LogitsProcessorList
 # Configure logging - suppress verbose output
 logger = logging.getLogger(__name__)
 
@@ -30,6 +23,12 @@ warnings.filterwarnings('ignore', message='.*torch_dtype.*deprecated.*')
 # Suppress logging from other modules during model loading
 logging.getLogger('transformers').setLevel(logging.ERROR)
 logging.getLogger('accelerate').setLevel(logging.ERROR)
+
+from model_loader import model_loader, ModelSource
+from config.prompts import AUDIO_EDIT_CLONE_SYSTEM_PROMPT_TPL, AUDIO_EDIT_SYSTEM_PROMPT
+from stepvocoder.cosyvoice2.cli.cosyvoice import CosyVoice
+from transformers.generation.logits_process import LogitsProcessor
+from transformers.generation.utils import LogitsProcessorList
 
 
 def check_interruption():
@@ -354,7 +353,15 @@ class StepAudioTTS:
         with torch.no_grad():
             try:
                 logger.debug(f"Starting voice cloning: {prompt_wav_path}")
-                prompt_wav, _ = torchaudio.load(prompt_wav_path)
+                
+                # CRITICAL FIX: Use soundfile directly instead of torchaudio
+                # This bypasses torchaudio's backend selection issues in containers
+                waveform_np, sample_rate = sf.read(prompt_wav_path)
+                if waveform_np.ndim == 1:
+                    prompt_wav = torch.from_numpy(waveform_np).unsqueeze(0).float()  # [samples] -> [1, samples]
+                else:
+                    prompt_wav = torch.from_numpy(waveform_np.T).float()  # [samples, channels] -> [channels, samples]
+                
                 vq0206_codes, vq02_codes_ori, vq06_codes_ori, speech_feat, _, speech_embedding = (
                     self.preprocess_prompt_wav(prompt_wav_path)
                 )
@@ -716,8 +723,15 @@ class StepAudioTTS:
             logger.error(f"Failed to process audio file: {e}")
             raise
 
-    def preprocess_prompt_wav(self, prompt_wav_path : str):
-        prompt_wav, prompt_wav_sr = torchaudio.load(prompt_wav_path)
+    def preprocess_prompt_wav(self, prompt_wav_path: str):
+        # CRITICAL FIX: Use soundfile directly instead of torchaudio
+        # This bypasses torchaudio's backend selection issues in containers
+        waveform_np, prompt_wav_sr = sf.read(prompt_wav_path)
+        if waveform_np.ndim == 1:
+            prompt_wav = torch.from_numpy(waveform_np).unsqueeze(0).float()  # [samples] -> [1, samples]
+        else:
+            prompt_wav = torch.from_numpy(waveform_np.T).float()  # [samples, channels] -> [channels, samples]
+        
         if prompt_wav.shape[0] > 1:
             prompt_wav = prompt_wav.mean(dim=0, keepdim=True)  # 将多通道音频转换为单通道
         speech_feat, speech_feat_len = self.cosy_model.frontend.extract_speech_feat(
@@ -747,4 +761,3 @@ class StepAudioTTS:
         hasher.update(audio_sample.tobytes())
         voice_hash = hasher.hexdigest()[:16]
         return f"clone_{voice_hash}"
-    

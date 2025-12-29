@@ -6,7 +6,7 @@ import logging
 
 import numpy as np
 import torch
-import torchaudio
+import soundfile as sf
 import onnxruntime
 import whisper
 
@@ -128,7 +128,10 @@ class StepAudioTokenizer:
 
     def get_vq02_code(self, audio, session_id=None, is_final=True):
         _tmp_wav = io.BytesIO()
-        torchaudio.save(_tmp_wav, audio, 16000, format="wav")
+        # CRITICAL FIX: Use soundfile directly instead of torchaudio for BytesIO
+        # This bypasses torchaudio's backend selection issues in containers
+        audio_np = audio.cpu().numpy().T  # soundfile expects [samples, channels]
+        sf.write(_tmp_wav, audio_np, 16000, format='wav')
         _tmp_wav.seek(0)
 
         with self.vq02_lock:

@@ -19,9 +19,29 @@ try:
     from tts import StepAudioTTS
     from tokenizer import StepAudioTokenizer
     from model_loader import ModelSource, model_loader
+    _IMPORT_ERROR = None
 except ImportError as e:
-    print(f"[StepAudio] ERROR: Failed to import bundled Step Audio modules: {e}")
-    print(f"[StepAudio] Make sure 'step_audio_impl' directory exists at: {STEP_AUDIO_IMPL_DIR}")
+    _IMPORT_ERROR = str(e)
+    print(f"\n{'='*80}")
+    print(f"[StepAudio] CRITICAL ERROR: Failed to import Step Audio modules")
+    print(f"{'='*80}")
+    print(f"Error: {e}")
+    print(f"\nThis usually means one of the following:")
+    print(f"  1. Missing dependencies - run: pip install -r requirements.txt")
+    print(f"  2. Missing openai-whisper - run: pip install openai-whisper")
+    print(f"  3. Missing onnxruntime - run: pip install onnxruntime")
+    print(f"  4. Corrupted installation - try reinstalling the custom node")
+    print(f"\nStep Audio implementation directory: {STEP_AUDIO_IMPL_DIR}")
+    print(f"{'='*80}\n")
+    StepAudioTTS = None
+    StepAudioTokenizer = None
+    ModelSource = None
+    model_loader = None
+except Exception as e:
+    _IMPORT_ERROR = str(e)
+    print(f"\n{'='*80}")
+    print(f"[StepAudio] UNEXPECTED ERROR during import: {e}")
+    print(f"{'='*80}\n")
     StepAudioTTS = None
     StepAudioTokenizer = None
     ModelSource = None
@@ -99,7 +119,23 @@ class StepAudioModelManager:
             ModelSource enum value
         """
         if ModelSource is None:
-            raise ImportError("ModelSource not available. Step Audio not properly imported.")
+            error_msg = (
+                "\n" + "="*80 + "\n"
+                "CRITICAL ERROR: ModelSource not available\n"
+                "="*80 + "\n"
+                "Step Audio modules failed to import during initialization.\n"
+            )
+            if _IMPORT_ERROR:
+                error_msg += f"\nOriginal import error: {_IMPORT_ERROR}\n"
+            error_msg += (
+                "\nCommon solutions:\n"
+                "  1. Install missing dependencies: pip install -r requirements.txt\n"
+                "  2. Restart ComfyUI after installing dependencies\n"
+                "  3. Check ComfyUI console for detailed error messages\n"
+                "\nIf the problem persists, please report this issue with the full error log.\n"
+                + "="*80
+            )
+            raise ImportError(error_msg)
 
         source_map = {
             "auto": ModelSource.AUTO,
@@ -128,7 +164,25 @@ class StepAudioModelManager:
             StepAudioTokenizer instance
         """
         if StepAudioTokenizer is None:
-            raise ImportError("StepAudioTokenizer not available. Step Audio not properly imported.")
+            error_msg = (
+                "\n" + "="*80 + "\n"
+                "CRITICAL ERROR: StepAudioTokenizer not available\n"
+                "="*80 + "\n"
+                "Step Audio modules failed to import during initialization.\n"
+            )
+            if _IMPORT_ERROR:
+                error_msg += f"\nOriginal import error: {_IMPORT_ERROR}\n"
+            error_msg += (
+                "\nCommon solutions:\n"
+                "  1. Install missing dependencies: pip install -r requirements.txt\n"
+                "  2. Install openai-whisper: pip install openai-whisper\n"
+                "  3. Install onnxruntime: pip install onnxruntime>=1.17.0\n"
+                "  4. Restart ComfyUI after installing dependencies\n"
+                "  5. Check ComfyUI console for detailed error messages\n"
+                "\nIf the problem persists, please report this issue with the full error log.\n"
+                + "="*80
+            )
+            raise ImportError(error_msg)
 
         # Generate cache key
         cache_key = f"{encoder_path}|{model_source}|{funasr_model_id}"
@@ -173,7 +227,25 @@ class StepAudioModelManager:
             StepAudioModelWrapper instance
         """
         if StepAudioTTS is None:
-            raise ImportError("StepAudioTTS not available. Step Audio not properly imported.")
+            error_msg = (
+                "\n" + "="*80 + "\n"
+                "CRITICAL ERROR: StepAudioTTS not available\n"
+                "="*80 + "\n"
+                "Step Audio modules failed to import during initialization.\n"
+            )
+            if _IMPORT_ERROR:
+                error_msg += f"\nOriginal import error: {_IMPORT_ERROR}\n"
+            error_msg += (
+                "\nCommon solutions:\n"
+                "  1. Install missing dependencies: pip install -r requirements.txt\n"
+                "  2. Install openai-whisper: pip install openai-whisper\n"
+                "  3. Install onnxruntime: pip install onnxruntime>=1.17.0\n"
+                "  4. Restart ComfyUI after installing dependencies\n"
+                "  5. Check ComfyUI console for detailed error messages\n"
+                "\nIf the problem persists, please report this issue with the full error log.\n"
+                + "="*80
+            )
+            raise ImportError(error_msg)
 
         # Generate cache key
         cache_key = cls.get_cache_key(config)
@@ -499,6 +571,7 @@ class StepAudioModelWrapper:
             Progress bar is not supported in edit mode.
         """
         import tempfile
+        import soundfile as sf
 
         # CRITICAL FIX: Check if model is still valid (not cleared by cache management)
         if self.model is None:
@@ -526,19 +599,20 @@ class StepAudioModelWrapper:
 
         # Additional iterations: refine the edit by re-editing the output
         if n_edit_iter > 1:
-            import torchaudio
             for i in range(n_edit_iter - 1):
                 print(f"[StepAudio]   Iteration {i+2}/{n_edit_iter}...")
 
                 # Save current output to temp file
                 with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_file:
                     temp_path = tmp_file.name
-                    # Ensure audio is in correct format for torchaudio.save
+                    # CRITICAL FIX: Use soundfile directly instead of torchaudio
+                    # This bypasses torchaudio's backend selection issues in containers
+                    # soundfile expects [samples, channels] for mono or [samples, channels] for stereo
                     if audio_tensor.dim() == 1:
-                        audio_tensor_save = audio_tensor.unsqueeze(0)
+                        waveform_np = audio_tensor.cpu().numpy()  # [samples]
                     else:
-                        audio_tensor_save = audio_tensor
-                    torchaudio.save(temp_path, audio_tensor_save, sample_rate)
+                        waveform_np = audio_tensor.cpu().numpy().T  # [channels, samples] -> [samples, channels]
+                    sf.write(temp_path, waveform_np, sample_rate)
 
                 try:
                     # Re-edit using the previous output
